@@ -1,6 +1,6 @@
 /* cnlp.h — the cnlp ABI: nonlinear programs behind shared libraries.
  *
- * Draft 2026-08-14.  THIS HEADER IS THE SPECIFICATION — there is no
+ * Version 0.1 (2026-08-14).  THIS HEADER IS THE SPECIFICATION — there is no
  * separate prose document to drift from it.  The README records how it
  * relates to CUTEst, CppADCodeGen, CasADi, FMI, ASL and NLPModels.jl.
  * Worked code: example/qp.c + example/solve.c in this repository (one
