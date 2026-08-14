@@ -30,6 +30,18 @@ direction — the consumer implements them for a solver — which is why a cnlp
 library binds directly to them. No standalone NLP ABI specification
 predates this one, to our knowledge.
 
+**[example/](example/)** is the whole ABI in two small plain-C files:
+[`qp.c`](example/qp.c), a complete size-parametric model library (~130
+lines, including the catalogue tier), and [`solve.c`](example/solve.c), a
+consumer that links against it — no dlopen, no tooling:
+
+```sh
+cc -shared -fPIC -O2 -o libqp.so qp.c
+cc -O2 -o solve solve.c -L. -lqp -Wl,-rpath,'$ORIGIN' -lm && ./solve
+```
+
+The same `libqp.so` loads unchanged in the Julia and Python consumers.
+
 Consumers: [CNLPModels.jl](https://github.com/madsuite-org/CNLPModels.jl)
 (Julia) and [cnlpmodels-py](https://github.com/madsuite-org/cnlpmodels-py)
 (Python, ctypes + numpy). Both carry `tinyqp.c`, a complete reference

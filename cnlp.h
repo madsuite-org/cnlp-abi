@@ -15,6 +15,9 @@
  *
  *     #include "cnlp.h"
  *     CNLP_DECLARE_MODEL(acopf)         // required: core + instantiation
+ *         //  is token pasting: this expands to acopf_new, acopf_obj,
+ *         // ... — the exported symbols carry no macro machinery.  See
+ *         // example/qp.c for a complete worked model.
  *     CNLP_DECLARE_NEW_STR(acopf)       // if the entry point is a string
  *     CNLP_DECLARE_BUILDER(acopf)       // if the model is structured
  *     CNLP_DECLARE_LAYOUT(acopf)        // if it publishes named blocks
