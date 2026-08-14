@@ -1,10 +1,12 @@
 /* cnlp.h — the cnlp ABI: nonlinear programs behind shared libraries.
  *
  * Draft 2026-08-14.  THIS HEADER IS THE SPECIFICATION — there is no
- * separate prose document to drift from it.  RELATED_WORK.md records how it
- * compares to CUTEst, CppADCodeGen, CasADi, FMI, ASL and NLPModels.jl; the
- * reference implementation is `tinyqp.c`, one plain-C file carried and
- * enforced by both consumer test suites (CNLPModels.jl, cnlpmodels-py).
+ * separate prose document to drift from it.  The README records how it
+ * relates to CUTEst, CppADCodeGen, CasADi, FMI, ASL and NLPModels.jl.
+ * Worked code: example/qp.c + example/solve.c in this repository (one
+ * model, both sides, ~170 lines); the conformance tests are the consumer
+ * suites (CNLPModels.jl, cnlpmodels-py), whose fixture `tinyqp.c` is a
+ * fuller multi-model reference.
  *
  * MODEL.  A library carries any number of MODELS, each under a symbol
  * prefix that IS its name.  A model is instantiated into INSTANCES behind
@@ -15,9 +17,9 @@
  *
  *     #include "cnlp.h"
  *     CNLP_DECLARE_MODEL(acopf)         // required: core + instantiation
- *         //  is token pasting: this expands to acopf_new, acopf_obj,
- *         // ... — the exported symbols carry no macro machinery.  See
- *         // example/qp.c for a complete worked model.
+ *         // "##" below is C token pasting: this expands to acopf_new,
+ *         // acopf_obj, ... — the exported symbols carry no macro
+ *         // machinery.  See example/qp.c for a complete worked model.
  *     CNLP_DECLARE_NEW_STR(acopf)       // if the entry point is a string
  *     CNLP_DECLARE_BUILDER(acopf)       // if the model is structured
  *     CNLP_DECLARE_LAYOUT(acopf)        // if it publishes named blocks
