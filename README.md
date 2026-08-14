@@ -10,8 +10,25 @@ behind plain C symbols, consumable from any language with a `dlopen`.
   every contract lives in its comments, and its X-macros declare the full
   surface for a symbol prefix, so implementers get prototype checking
   against the same file they read.
-- **[RELATED_WORK.md](RELATED_WORK.md)** — how this relates to CUTEst,
-  CppADCodeGen, CasADi, FMI, ASL, and NLPModels.jl, and what it borrows.
+
+## Relation to prior work
+
+The evaluation semantics are [NLPModels.jl](https://jso.dev/NLPModels.jl/stable/api/)'s,
+transliterated to C; the Lagrangian-Hessian convention (objective weight +
+multipliers, lower triangle) goes back to the
+[AMPL Solver Library](https://www.netlib.org/ampl/solvers/asl.h). The
+compiled-model-per-library idea is [CUTEst](https://github.com/ralna/CUTEst)'s,
+here made size-parametric at runtime and multi-model;
+[CppADCodeGen](https://github.com/joaoleal/CppADCodeGen) pioneered the
+in-library model catalogue this ABI's fixed-name symbols follow, and
+[CasADi](https://web.casadi.org/docs/)'s codegen convention is the
+function-level cousin. [FMI](https://fmi-standard.org) is the architectural
+analogue from simulation — shared library, typed description, instantiation,
+live parameters — with no NLP contract; this ABI is, structurally, FMI for
+NLPs. Solver C APIs (Ipopt, nlopt) define the same callbacks in the opposite
+direction — the consumer implements them for a solver — which is why a cnlp
+library binds directly to them. No standalone NLP ABI specification
+predates this one, to our knowledge.
 
 Consumers: [CNLPModels.jl](https://github.com/madsuite-org/CNLPModels.jl)
 (Julia) and [cnlpmodels-py](https://github.com/madsuite-org/cnlpmodels-py)
