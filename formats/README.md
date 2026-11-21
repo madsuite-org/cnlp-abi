@@ -79,6 +79,34 @@ the right kind, type and length, and, for a solution, the sizes match the model'
 failed check is an error. A consumer may offer an explicit override for deliberate use on
 a different instance.
 
+## Model-specific formats
+
+A model may also have its own formats: an OPF model reads and writes MATPOWER cases, for
+example. These are provided by the **library**, through its readers and writers (`cnlp.h`:
+the readers and writers tiers), and identified by name:
+
+| Direction | Standard format | Model-specific (in the library) |
+|---|---|---|
+| create an instance | `cnlp-input` | instance readers, `P_new_from_<name>` |
+| set parameters | `cnlp-parameters` | parameter readers, `P_set_from_<name>` |
+| warm start | a `cnlp-solution` file | start readers, `P_start_from_<name>` |
+| write a solution | `cnlp-solution` | writers, `P_write_<name>` |
+
+Three rules:
+
+1. **Additive.** A model's formats sit alongside the standard ones and never replace them.
+   A consumer can always read and write the standard formats, so a tool that knows nothing
+   about a model's domain still works with it.
+2. **Discoverable.** Readers and writers are listed by name, and a model may name a default
+   for each direction (`P_default_reader`, `P_default_writer`). A consumer given a bare path
+   uses the default, and otherwise the standard format.
+3. **The logic is the model's.** A reader or writer runs inside the library, compiled from
+   the modelling package's own code, so consumers need no knowledge of the file format.
+   They pass a path.
+
+Consumers name a model format as `name:path` where one is expected, e.g.
+`--input matpower:case.m --start case:solved.m --output sol.m`.
+
 ## Conformance
 
 Reference files for each format and encoding live in [conformance/](../conformance/).

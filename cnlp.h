@@ -28,6 +28,7 @@
  *     CNLP_DECLARE_LAYOUT(acopf)        // if it publishes named blocks
  *     CNLP_DECLARE_SENSE(acopf)         // if it maximizes (0.2)
  *     CNLP_DECLARE_WRITERS(acopf)       // if it carries solution writers (0.2)
+ *     CNLP_DECLARE_READERS(acopf)       // if it reads its own input formats (0.2)
  *     CNLP_DECLARE_DEVICE(acopf)        // if it evaluates on a GPU (0.2)
  *
  * SEMANTICS.  The evaluation surface is a C transliteration of
@@ -209,6 +210,39 @@ int32_t cnlp_model_name(int32_t k, uint8_t* buf, int32_t cap);
     int32_t P##_nwriters(void);                                               \
     int32_t P##_writer_name(int32_t k, uint8_t* buf, int32_t cap);            \
     int32_t P##_default_writer(int32_t id, uint8_t* buf, int32_t cap);
+
+/* ── Readers (0.2; optional per model; witness: P##_nreaders) ─────────────
+ * The mirror of writers: the model's own input formats, alongside the
+ * standard ones of formats/ (which every consumer can always use).  Reader
+ * k (0-based) has a name, by the string convention, and a kind:
+ *
+ *     P##_reader_kind(k):  0 = instance, 1 = parameters, 2 = start;
+ *                          -1 = k out of range.
+ *
+ * By kind, reader "name" is exported as
+ *
+ *     instance    int32_t P##_new_from_<name>(const char* path);
+ *                 -> id > 0; 0 = failure.  Creates an instance from the
+ *                 model's own file (an OPF case, say).
+ *     parameters  int32_t P##_set_from_<name>(int32_t id, const char* path);
+ *                 -> 0, or a status as for P##_set_value.  Sets parameter
+ *                 blocks from the file; live, like P##_set_value.
+ *     start       int32_t P##_start_from_<name>(int32_t id, const char* path,
+ *                     double* x0, double* y0, double* zl, double* zu);
+ *                 -> 0 or a status.  Fills host arrays of length nvar, ncon,
+ *                 nvar, nvar with a starting point read from the file, every
+ *                 entry written, 0 where the file has no value.
+ *
+ * Names are unique per model across kinds.  P##_default_reader names the
+ * instance reader a consumer uses for a bare path (0 = none); it is
+ * library-level, since it is needed before any instance exists.  When a
+ * model also exports P##_new_str, the two must agree: P##_new_str is the
+ * default instance reader under its 0.1 name. */
+#define CNLP_DECLARE_READERS(P)                                               \
+    int32_t P##_nreaders(void);                                               \
+    int32_t P##_reader_name(int32_t k, uint8_t* buf, int32_t cap);            \
+    int32_t P##_reader_kind(int32_t k);                                       \
+    int32_t P##_default_reader(uint8_t* buf, int32_t cap);
 
 /* ── Device evaluation (0.2; optional per model; witness: P##_device) ─────
  * Evaluation on a GPU with device pointers in and out.  P##_device(id)
