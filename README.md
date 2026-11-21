@@ -10,6 +10,13 @@ behind plain C symbols, consumable from any language with a `dlopen`.
   every contract lives in its comments, and its X-macros declare the full
   surface for a symbol prefix, so implementers get prototype checking
   against the same file they read.
+- **[formats/](formats/)**: the files that go with the ABI, specified in
+  terms of what the header publishes: the input a model is instantiated from
+  ([input.md](formats/input.md)), parameter values
+  ([parameters.md](formats/parameters.md)), and solutions
+  ([solution.md](formats/solution.md)). The header specifies the interface;
+  these specify the data, so a file written by one consumer is read by any
+  other.
 
 ## Relation to prior work
 

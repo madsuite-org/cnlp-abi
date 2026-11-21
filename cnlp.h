@@ -1,8 +1,11 @@
 /* cnlp.h — the cnlp ABI: nonlinear programs behind shared libraries.
  *
- * Version 0.1 (2026-08-14).  THIS HEADER IS THE SPECIFICATION — there is no
- * separate prose document to drift from it.  The README records how it
- * relates to CUTEst, CppADCodeGen, CasADi, FMI, ASL and NLPModels.jl.
+ * Version 0.2 (DRAFT; 0.1 was 2026-08-14).  THIS HEADER IS THE SPECIFICATION
+ * of the interface — there is no separate prose document to drift from it.
+ * The files that go with it (instance input, parameter values, solutions)
+ * are specified in formats/, in terms of what this header publishes.  The
+ * README records how it relates to CUTEst, CppADCodeGen, CasADi, FMI, ASL
+ * and NLPModels.jl.
  * Worked code: example/qp.c + example/solve.c in this repository (one
  * model, both sides, ~170 lines); the conformance tests are the consumer
  * suites (CNLPModels.jl, cnlpmodels-py), whose fixture `tinyqp.c` is a
@@ -23,6 +26,9 @@
  *     CNLP_DECLARE_NEW_STR(acopf)       // if the entry point is a string
  *     CNLP_DECLARE_BUILDER(acopf)       // if the model is structured
  *     CNLP_DECLARE_LAYOUT(acopf)        // if it publishes named blocks
+ *     CNLP_DECLARE_SENSE(acopf)         // if it maximizes (0.2)
+ *     CNLP_DECLARE_WRITERS(acopf)       // if it carries solution writers (0.2)
+ *     CNLP_DECLARE_DEVICE(acopf)        // if it evaluates on a GPU (0.2)
  *
  * SEMANTICS.  The evaluation surface is a C transliteration of
  * NLPModels.jl's API (https://jso.dev/NLPModels.jl/stable/api/), inheriting
@@ -176,6 +182,56 @@ int32_t cnlp_model_name(int32_t k, uint8_t* buf, int32_t cap);
     int32_t P##_get_value(int32_t id, int32_t k, double* vals, int32_t len);  \
     int32_t P##_set_value(int32_t id, int32_t k,                              \
                           const double* vals, int32_t len);
+
+/* ── Objective sense (0.2; optional per model; witness: P##_minimize) ─────
+ * 1 = minimize, 0 = maximize, -1 = invalid id.  A consumer that does not
+ * find it assumes minimize — so a library MUST export it for every model
+ * it maximizes, or consumers solve the wrong problem (and report success).
+ * P##_obj returns f(x) in the model's own sense, never negated. */
+#define CNLP_DECLARE_SENSE(P)                                                 \
+    int32_t P##_minimize(int32_t id);
+
+/* ── Solution writers (0.2; optional per model; witness: P##_nwriters) ────
+ * Code that turns a solution into the model's own file format (a solved
+ * MATPOWER case, say).  Writer k (0-based) has a name, by the string
+ * convention; writer "name" is exported as
+ *
+ *     int32_t P##_write_<name>(int32_t id, const char* path,
+ *                              const double* x,  const double* y,
+ *                              const double* zl, const double* zu,
+ *                              double objective, const char* status);
+ *
+ * with host arrays of length nvar, ncon, nvar, nvar, and status any string
+ * (NULL allowed).  P##_default_writer names the writer a consumer uses when
+ * asked for "the" solution file without a format; 0 means none, and the
+ * consumer writes the standard cnlp-solution format (formats/solution.md). */
+#define CNLP_DECLARE_WRITERS(P)                                               \
+    int32_t P##_nwriters(void);                                               \
+    int32_t P##_writer_name(int32_t k, uint8_t* buf, int32_t cap);            \
+    int32_t P##_default_writer(int32_t id, uint8_t* buf, int32_t cap);
+
+/* ── Device evaluation (0.2; optional per model; witness: P##_device) ─────
+ * Evaluation on a GPU with device pointers in and out.  P##_device(id)
+ * returns the memory space the _d callbacks expect: 1 = CUDA, device 0's
+ * PRIMARY context (the one the CUDA runtime and CUDA.jl use), -1 = invalid
+ * id; 0 is reserved for "no device" and never returned by a library that
+ * exports the tier.  Every array argument of a _d callback is a device
+ * pointer of the length named in the core tier, except P##_obj_d's `out`:
+ * one double in HOST memory.  Structures (P##_jac_structure,
+ * P##_hess_structure) and metadata stay host-side; their order is the order
+ * of the _d value arrays.  Synchronous: each call returns with its results
+ * complete in device memory, ordered after all prior work in the context.
+ * Parameters set with P##_set_value take effect for the next _d call.
+ * Candidate extensions, signature-preserving: P##_set_device(id, ordinal),
+ * P##_set_stream(id, stream) for asynchronous calls on the caller's stream. */
+#define CNLP_DECLARE_DEVICE(P)                                                \
+    int32_t P##_device(int32_t id);                                           \
+    int32_t P##_obj_d (int32_t id, const double* x, double* out);            \
+    int32_t P##_grad_d(int32_t id, const double* x, double* g);              \
+    int32_t P##_cons_d(int32_t id, const double* x, double* c);              \
+    int32_t P##_jac_d (int32_t id, const double* x, double* vals);           \
+    int32_t P##_hess_d(int32_t id, const double* x, const double* y,         \
+                       double obj_weight, double* vals);
 
 #ifdef __cplusplus
 } /* extern "C" */
