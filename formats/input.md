@@ -1,6 +1,6 @@
 # cnlp-input: what a model is instantiated from
 
-Draft for version 0.2. Shared conventions (encodings, identification, arrays):
+Version 0.2. Shared conventions (encodings, identification, arrays):
 [README.md](README.md).
 
 A model is instantiated through exactly one entry point, and `P_argtype` says which.

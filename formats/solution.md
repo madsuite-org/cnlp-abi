@@ -1,6 +1,6 @@
 # cnlp-solution: a solution of a model
 
-Draft for version 0.2. Shared conventions (encodings, identification, arrays):
+Version 0.2. Shared conventions (encodings, identification, arrays):
 [README.md](README.md).
 
 The problem is
@@ -125,16 +125,34 @@ A solution read against a model is a warm start: `solution`, `multipliers`,
 
 The fingerprint digests the instance's **structure**: `nvar`, `ncon`, the Jacobian and
 Hessian sparsity patterns, and the block layout. It excludes bounds and parameters, so a
-solution can warm-start a perturbed instance of the same structure. It is SHA-256 over a
-canonical serialization given with the conformance files. A library may export it, or a
-consumer computes it from the ABI's structure calls. A digest that also covers bounds and
+solution can warm-start a perturbed instance of the same structure. It is SHA-256 over the
+serialization of section 6.3. A consumer computes it from the ABI's structure calls;
+`conformance/fingerprint.py` is the reference implementation. A digest that also covers bounds and
 parameters, telling "the same instance" from "the same structure", may be added later as a
 separate optional field; it would not change this one.
 
 A failed check is an error. A consumer may offer an explicit override, for deliberately
 using a solution on a different instance.
 
-## 7. Open questions
+### 6.3 The fingerprint
 
-1. Several solutions in one file (a sweep): proposed out of scope for 0.2, one file per
-   solution.
+The fingerprint is the string `sha256:` followed by the lowercase hexadecimal SHA-256 of
+these bytes, in order, every integer a little-endian `int64`:
+
+1. the 18 ASCII bytes `cnlp-fingerprint/1`;
+2. `nvar`, `ncon`;
+3. `nnzj`, then the `nnzj` row indices, then the `nnzj` column indices, as
+   `P_jac_structure` returns them (1-based, in its order);
+4. `nnzh`, then its row indices, then its column indices, as `P_hess_structure` returns
+   them;
+5. the number of named blocks (`P_nblocks`, or 0 for a model without the layout tier),
+   then for each block k in order: `kind`, `offset`, `length`, `ndims`, the `ndims`
+   dimensions (as `P_block` returns them), the byte length of its name, and the name's
+   UTF-8 bytes.
+
+Bounds, the starting point and parameter values are not included. The prefix names the
+serialization, so a future one gets a new prefix rather than a different meaning.
+
+## 7. Not in 0.2
+
+Several solutions in one file (a sweep) are out of scope: one file holds one solution.

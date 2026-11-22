@@ -1,0 +1,4 @@
+{
+  "format": "cnlp-input", "format_version": "0.2", "library": "libqp", "model": "qp",
+  "input": {"n": 4}
+}

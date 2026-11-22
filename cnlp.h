@@ -1,14 +1,15 @@
 /* cnlp.h — cnlp, the C ABI for nonlinear programs.
  *
- * Version 0.2 (DRAFT; 0.1 was 2026-08-14).  THIS HEADER IS THE SPECIFICATION
+ * Version 0.2 (2026-11-22; 0.1 was 2026-08-14).  THIS HEADER IS THE SPECIFICATION
  * of the interface — there is no separate prose document to drift from it.
  * The files that go with it (instance input, parameter values, solutions)
  * are specified in formats/, in terms of what this header publishes.  The
- * README records how it relates to CUTEst, CppADCodeGen, CasADi, FMI, ASL
- * and NLPModels.jl.
+ * README records how it relates to CUTEst, CppADCodeGen, FMI, ASL and
+ * NLPModels.jl.
  * Worked code: example/qp.c + example/solve.c in this repository (one
- * model, both sides, ~170 lines); the conformance tests are the consumer
- * suites (CNLPModels.jl, cnlpmodels-py), whose fixture `tinyqp.c` is a
+ * model, both sides).  Reference files and the reference fingerprint
+ * implementation are in conformance/; the consumer suites (CNLPModels.jl,
+ * cnlpmodels-py) test against them, and their fixture `tinyqp.c` is a
  * fuller multi-model reference.
  *
  * MODEL.  A library carries any number of MODELS, each under a symbol

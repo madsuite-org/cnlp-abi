@@ -1,0 +1,15 @@
+{
+  "format": "cnlp-solution", "format_version": "0.2", "library": "libqp", "model": "qp",
+  "nvar": 4, "ncon": 1,
+  "fingerprint": "sha256:94d2d158baec993ec633fb8d07b47155928013d114b7474f490cf92cd6c9dbd0",
+  "solution": {
+    "solution": [0.5, 0.5, 1.0, 1.0],
+    "multipliers": [1.0],
+    "multipliers_L": [0.0, 0.0, 0.0, 0.0],
+    "multipliers_U": [0.0, 0.0, 0.0, 0.0],
+    "objective": 0.5,
+    "minimize": true,
+    "status": "solved",
+    "iterations": -1
+  }
+}

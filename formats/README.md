@@ -1,6 +1,6 @@
 # cnlp data formats
 
-Draft for version 0.2 of the cnlp ABI.
+Version 0.2 of the cnlp ABI.
 
 `cnlp.h` specifies how a program talks to a model library. These documents specify the
 files that go with it: what a model is instantiated from, the parameter values it is
@@ -44,7 +44,7 @@ members:
 | Field | Type | Meaning |
 |---|---|---|
 | `format` | string | the format of the main section: `"cnlp-input"`, `"cnlp-parameters"` or `"cnlp-solution"` |
-| `format_version` | string | `"MAJOR.MINOR"` of these documents; this draft is `"0.2"` |
+| `format_version` | string | `"MAJOR.MINOR"` of these documents: `"0.2"` |
 | `library` | string | optional: the library the model comes from |
 | `model` | string | optional: the model name, which is its symbol prefix |
 
@@ -68,7 +68,8 @@ Every name in a file comes from the ABI and is never invented by the writer:
 
 ### Arrays
 
-- Floating-point values are IEEE 754 binary64, integers are signed 64-bit.
+- Floating-point values are IEEE 754 binary64, integers are signed 64-bit. A boolean is
+  `true`/`false` in JSON and an 8-bit integer 0 or 1 in HDF5.
 - A block's array is stored with its shape, in **column-major** order: the first index
   varies fastest, as in Fortran, Julia and MATLAB. `dims` always gives the shape in that
   order. A row-major reader (NumPy, C) sees the shape reversed and reads with

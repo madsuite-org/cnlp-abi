@@ -1,6 +1,6 @@
 # cnlp-parameters: values of a model's parameters
 
-Draft for version 0.2. Shared conventions (encodings, identification, arrays):
+Version 0.2. Shared conventions (encodings, identification, arrays):
 [README.md](README.md).
 
 Parameters are the values a model is evaluated at that can change without
