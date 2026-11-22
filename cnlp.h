@@ -71,14 +71,6 @@
  * expression tree is a particular modelling package's representation, and
  * asking for one would make this that package's interface in C clothing
  * rather than a generic abstraction over "an NLP behind a C boundary".
- *
- * CANDIDATE EXTENSIONS (absent today, in likely order): Hessian/Jacobian-
- * vector products (P_hprod / P_jprod — consumers currently assemble
- * products from the COO callbacks); constraint linearity/equality
- * classification and integer variables; an explicit reentrancy contract
- * (today: distinct instances from distinct threads is expected to work, a
- * single instance is not promised reentrant); per-block descriptions
- * (P_block_desc).
  */
 #ifndef CNLP_H
 #define CNLP_H
@@ -264,9 +256,7 @@ int64_t cnlp_abi_version(void);
  * P##_hess_structure) and metadata stay host-side; their order is the order
  * of the _d value arrays.  Synchronous: each call returns with its results
  * complete in device memory, ordered after all prior work in the context.
- * Parameters set with P##_set_value take effect for the next _d call.
- * Candidate extensions, signature-preserving: P##_set_device(id, ordinal),
- * P##_set_stream(id, stream) for asynchronous calls on the caller's stream. */
+ * Parameters set with P##_set_value take effect for the next _d call. */
 #define CNLP_DECLARE_DEVICE(P)                                                \
     int64_t P##_device(int64_t id);                                           \
     int64_t P##_obj_d (int64_t id, const double* x, double* out);            \

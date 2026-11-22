@@ -127,9 +127,7 @@ The fingerprint digests the instance's **structure**: `nvar`, `ncon`, the Jacobi
 Hessian sparsity patterns, and the block layout. It excludes bounds and parameters, so a
 solution can warm-start a perturbed instance of the same structure. It is SHA-256 over the
 serialization of section 6.3. A consumer computes it from the ABI's structure calls;
-`conformance/fingerprint.py` is the reference implementation. A digest that also covers bounds and
-parameters, telling "the same instance" from "the same structure", may be added later as a
-separate optional field; it would not change this one.
+`conformance/fingerprint.py` is the reference implementation.
 
 A failed check is an error. A consumer may offer an explicit override, for deliberately
 using a solution on a different instance.
@@ -152,7 +150,3 @@ these bytes, in order, every integer a little-endian `int64`:
 
 Bounds, the starting point and parameter values are not included. The prefix names the
 serialization, so a future one gets a new prefix rather than a different meaning.
-
-## 7. Not in 0.2
-
-Several solutions in one file (a sweep) are out of scope: one file holds one solution.
