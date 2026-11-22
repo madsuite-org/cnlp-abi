@@ -5,7 +5,11 @@
  *     minimize   sum_i (x_i - 1)^2       over x in R^n
  *     subject to x_1 + x_2 = 1
  *
- * Build:    cc -shared -fPIC -O2 -o libqp.so qp.c
+ * It also evaluates in a second number format, double-double (formats/numbers.md:
+ * `double_binary64`), through the number-format tier, to show how a library
+ * offers a format that C has no type for.
+ *
+ * Build:    cc -shared -fPIC -O2 -o libqp.so qp.c -lm
  * Consume:  see solve.c next to this file — or any cnlp consumer:
  *           CNLPModels.jl:  CNLPModel("path/to/libqp.so", 4)
  *           cnlpmodels-py:  cnlpmodels.CModel("path/to/libqp.so", 4)
@@ -18,6 +22,7 @@
 #include "../cnlp.h"
 
 CNLP_DECLARE_MODEL(qp)
+CNLP_DECLARE_FORMATS(qp)
 
 /* Instances are just sizes behind ids; a static table suffices. */
 #define QP_MAX_INSTANCES 32
@@ -120,6 +125,100 @@ int64_t qp_hess(int64_t id, const double* x, const double* y,
     if (!valid(id)) return 1;
     int64_t n = qp_sizes[id - 1];
     for (int64_t i = 0; i < n; i++) vals[i] = 2.0 * obj_weight;
+    return 0;
+}
+
+/* ── double-double (number-format tier) ─────────────────────────────────────
+ * A double-double is two doubles {hi, lo} whose exact sum is the value, with
+ * |lo| <= ulp(hi)/2: about 106 bits of significand.  The arithmetic below is
+ * the classic error-free transformations (Dekker, Knuth); fma gives the exact
+ * product error. */
+
+typedef struct { double hi, lo; } dd;
+
+static dd two_sum(double a, double b) {
+    double s = a + b, bb = s - a;
+    return (dd){ s, (a - (s - bb)) + (b - bb) };
+}
+static dd quick_two_sum(double a, double b) {     /* requires |a| >= |b| */
+    double s = a + b;
+    return (dd){ s, b - (s - a) };
+}
+static dd dd_add(dd a, dd b) {
+    dd s = two_sum(a.hi, b.hi);
+    return quick_two_sum(s.hi, s.lo + a.lo + b.lo);
+}
+static dd dd_mul(dd a, dd b) {
+    double p = a.hi * b.hi, e = fma(a.hi, b.hi, -p);
+    return quick_two_sum(p, e + a.hi * b.lo + a.lo * b.hi);
+}
+static dd dd_scale2(dd a) { return (dd){ 2.0 * a.hi, 2.0 * a.lo }; }   /* exact */
+static dd dd_of(double a) { return (dd){ a, 0.0 }; }
+
+/* The model offers one extra format, index 0. */
+int64_t qp_nformats(int64_t id) { return valid(id) ? 1 : -1; }
+
+int64_t qp_format_name(int64_t id, int64_t k, uint8_t* buf, int64_t cap) {
+    if (!valid(id) || k != 0) return -1;
+    static const char nm[] = "double_binary64";
+    int64_t len = (int64_t)sizeof(nm) - 1;
+    for (int64_t i = 0; i < cap && i < len; i++) buf[i] = (uint8_t)nm[i];
+    return len;
+}
+
+/* Every buffer is an array of dd elements; prec is ignored (fixed format). */
+#define QP_X_CHECK(id, k) do { if (!valid(id)) return 1; if ((k) != 0) return 1; } while (0)
+
+int64_t qp_xmeta(int64_t id, int64_t k, int64_t prec, void* x0, void* lvar,
+                 void* uvar, void* lcon, void* ucon) {
+    (void)prec; QP_X_CHECK(id, k);
+    int64_t n = qp_sizes[id - 1];
+    dd *x = x0, *lv = lvar, *uv = uvar, *lc = lcon, *uc = ucon;
+    for (int64_t i = 0; i < n; i++) {
+        x[i] = dd_of(0.0); lv[i] = dd_of(-INFINITY); uv[i] = dd_of(INFINITY);
+    }
+    lc[0] = dd_of(1.0); uc[0] = dd_of(1.0);
+    return 0;
+}
+
+int64_t qp_xobj(int64_t id, int64_t k, int64_t prec, const void* xv, void* out) {
+    (void)prec; QP_X_CHECK(id, k);
+    const dd* x = xv;
+    dd f = dd_of(0.0);
+    for (int64_t i = 0; i < qp_sizes[id - 1]; i++) {
+        dd d = dd_add(x[i], dd_of(-1.0));
+        f = dd_add(f, dd_mul(d, d));
+    }
+    *(dd*)out = f;
+    return 0;
+}
+
+int64_t qp_xgrad(int64_t id, int64_t k, int64_t prec, const void* xv, void* gv) {
+    (void)prec; QP_X_CHECK(id, k);
+    const dd* x = xv; dd* g = gv;
+    for (int64_t i = 0; i < qp_sizes[id - 1]; i++) g[i] = dd_scale2(dd_add(x[i], dd_of(-1.0)));
+    return 0;
+}
+
+int64_t qp_xcons(int64_t id, int64_t k, int64_t prec, const void* xv, void* cv) {
+    (void)prec; QP_X_CHECK(id, k);
+    const dd* x = xv;
+    ((dd*)cv)[0] = dd_add(x[0], x[1]);
+    return 0;
+}
+
+int64_t qp_xjac(int64_t id, int64_t k, int64_t prec, const void* xv, void* vals) {
+    (void)prec; (void)xv; QP_X_CHECK(id, k);
+    ((dd*)vals)[0] = dd_of(1.0);
+    ((dd*)vals)[1] = dd_of(1.0);
+    return 0;
+}
+
+int64_t qp_xhess(int64_t id, int64_t k, int64_t prec, const void* xv, const void* yv,
+                 const void* obj_weight, void* vals) {
+    (void)prec; (void)xv; (void)yv; QP_X_CHECK(id, k);
+    dd w2 = dd_scale2(*(const dd*)obj_weight);
+    for (int64_t i = 0; i < qp_sizes[id - 1]; i++) ((dd*)vals)[i] = w2;
     return 0;
 }
 

@@ -3,7 +3,7 @@
  * Linking against the library and declaring the symbols through cnlp.h is
  * all it takes — no dlopen needed when the prefix is known at compile time:
  *
- *     cc -shared -fPIC -O2 -o libqp.so qp.c
+ *     cc -shared -fPIC -O2 -o libqp.so qp.c -lm
  *     cc -O2 -o solve solve.c -L. -lqp -Wl,-rpath,'$ORIGIN' -lm
  *     ./solve
  *
@@ -16,6 +16,9 @@
 #include "../cnlp.h"
 
 CNLP_DECLARE_MODEL(qp)
+CNLP_DECLARE_FORMATS(qp)
+
+typedef struct { double hi, lo; } dd;   /* formats/numbers.md: double_binary64 */
 
 int main(void) {
     /* Instantiate at a size of our choosing — the library was compiled
@@ -39,6 +42,20 @@ int main(void) {
     printf("f(x*) = %g   c(x*) = %g   g(x*) = [%g %g %g %g]\n",
            f, c[0], g[0], g[1], g[2], g[3]);
 
+    /* The same objective in double-double, at x = 1 + 2^-60 in every
+     * coordinate.  In double that point rounds to x = 1, where f = 0; in
+     * double-double the objective is 4 * 2^-120 exactly. */
+    uint8_t name[64];
+    int64_t len = qp_format_name(id, 0, name, sizeof name - 1);
+    name[len] = 0;
+    dd xd[4], fd;
+    for (int i = 0; i < 4; i++) xd[i] = (dd){ 1.0, 0x1p-60 };
+    if (qp_xobj(id, 0, 0, xd, &fd) != 0) return 1;
+    double xr[] = { 1.0 + 0x1p-60, 1.0 + 0x1p-60, 1.0 + 0x1p-60, 1.0 + 0x1p-60 }, fr;
+    qp_obj(id, xr, &fr);
+    printf("format 0 = %s:  f(1 + 2^-60) = %g + %g  (double gives %g)\n",
+           (char*)name, fd.hi, fd.lo, fr);
+
     free(x0); free(lv); free(uv); free(g);
-    return f == 0.5 && c[0] == 1.0 ? 0 : 1;
+    return f == 0.5 && c[0] == 1.0 && fd.hi == 0x1p-118 && fr == 0.0 ? 0 : 1;
 }

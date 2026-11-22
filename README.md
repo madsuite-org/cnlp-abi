@@ -29,9 +29,12 @@ does not export.
 
 ```sh
 cd example
-cc -shared -fPIC -O2 -o libqp.so qp.c
+cc -shared -fPIC -O2 -o libqp.so qp.c -lm
 cc -O2 -o solve solve.c -L. -lqp -Wl,-rpath,'$ORIGIN' -lm && ./solve
 ```
+
+The example model also evaluates in double-double (`double_binary64`) through the
+number-format tier: a format with no C type, carried as two `double`s per value.
 
 ## Producers and consumers
 
