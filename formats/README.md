@@ -14,6 +14,10 @@ and write them using only what the ABI publishes, so a file written by one consu
 | `cnlp-parameters` | [parameters.md](parameters.md) | parameter values, by block name | the layout tier, `P_set_value` |
 | `cnlp-solution` | [solution.md](solution.md) | a solution and its multipliers | the core and layout tiers |
 
+[numbers.md](numbers.md) is not a file format: it names the number formats a model can be
+evaluated in (binary32, binary128, double-double, arbitrary precision) and fixes their
+memory layout, for the single-precision family and the number-format tier of `cnlp.h`.
+
 A solution file is also a valid warm start: its arrays are the initial point and
 multipliers of a new solve (solution.md, section 6).
 

@@ -1,4 +1,4 @@
-/* cnlp.h — the cnlp ABI: nonlinear programs behind shared libraries.
+/* cnlp.h — cnlp, the C ABI for nonlinear programs.
  *
  * Version 0.2 (DRAFT; 0.1 was 2026-08-14).  THIS HEADER IS THE SPECIFICATION
  * of the interface — there is no separate prose document to drift from it.
@@ -30,6 +30,8 @@
  *     CNLP_DECLARE_WRITERS(acopf)       // if it carries solution writers (0.2)
  *     CNLP_DECLARE_READERS(acopf)       // if it reads its own input formats (0.2)
  *     CNLP_DECLARE_DEVICE(acopf)        // if it evaluates on a GPU (0.2)
+ *     CNLP_DECLARE_SINGLE(acopf)        // if it evaluates in binary32 (0.2)
+ *     CNLP_DECLARE_FORMATS(acopf)       // if it evaluates in other formats (0.2)
  *
  * SEMANTICS.  The evaluation surface is a C transliteration of
  * NLPModels.jl's API (https://jso.dev/NLPModels.jl/stable/api/), inheriting
@@ -47,7 +49,8 @@
  * for those, 0 from an id-returning function means instantiation failure,
  * and -1 means an index out of range.  1 = invalid id, unknown index, or a
  * block of the wrong kind; 3 = a length disagreeing with the addressed
- * object; any other nonzero from an evaluator is a model-defined failure.
+ * object; 4 = a precision the library cannot evaluate at (format tier);
+ * any other nonzero from an evaluator is a model-defined failure.
  * Never let an exception or longjmp cross the boundary.
  *
  * STRINGS use one copy-out convention everywhere: the function returns the
@@ -68,13 +71,12 @@
  *
  * CANDIDATE EXTENSIONS (absent today, in likely order): Hessian/Jacobian-
  * vector products (P_hprod / P_jprod — consumers currently assemble
- * products from the COO callbacks); a library-level version symbol
- * (cnlp_abi_version, CppADCodeGen's pattern) once the packages register;
- * constraint linearity/equality classification and integer variables;
- * precision/index-width variants (CUTEst's suffix discipline is the
- * template); an explicit reentrancy contract (today: distinct instances
- * from distinct threads is expected to work, a single instance is not
- * promised reentrant); per-block descriptions (P_block_desc).
+ * products from the COO callbacks); constraint linearity/equality
+ * classification and integer variables; 64-bit index variants (CUTEst's
+ * suffix discipline is the template); an explicit reentrancy contract
+ * (today: distinct instances from distinct threads is expected to work, a
+ * single instance is not promised reentrant); per-block descriptions
+ * (P_block_desc).
  */
 #ifndef CNLP_H
 #define CNLP_H
@@ -92,6 +94,11 @@ extern "C" {
  * above; the name IS the symbol prefix its functions are exported under. */
 int32_t cnlp_nmodels(void);
 int32_t cnlp_model_name(int32_t k, uint8_t* buf, int32_t cap);
+
+/* The version of this specification a library implements, as
+ * major * 1000 + minor (2 for 0.2).  Optional (0.2; witness: the symbol
+ * itself); a library without it implements 0.1. */
+int32_t cnlp_abi_version(void);
 
 /* ── Core + instantiation, per prefix P (required) ────────────────────────
  * Exactly ONE of P##_new / P##_new_str / the builder is the model's entry
@@ -266,6 +273,76 @@ int32_t cnlp_model_name(int32_t k, uint8_t* buf, int32_t cap);
     int32_t P##_jac_d (int32_t id, const double* x, double* vals);           \
     int32_t P##_hess_d(int32_t id, const double* x, const double* y,         \
                        double obj_weight, double* vals);
+
+/* ── Single precision (0.2; optional per model; witness: P##_sobj) ─────────
+ * The core evaluation callbacks in IEEE binary32 (C `float`), on the same
+ * instance as the double ones: instantiation, sizes, structures and P##_meta
+ * are shared.  The BLAS convention: the unlettered symbols are the binary64
+ * family, `s` the binary32 one.  A library with the device tier may also
+ * export the binary32 device callbacks (witness: P##_sobj_d), with the
+ * conventions of the device tier. */
+#define CNLP_DECLARE_SINGLE(P)                                                \
+    int32_t P##_sobj (int32_t id, const float* x, float* out);   /* 1     */ \
+    int32_t P##_sgrad(int32_t id, const float* x, float* g);     /* nvar  */ \
+    int32_t P##_scons(int32_t id, const float* x, float* c);     /* ncon  */ \
+    int32_t P##_sjac (int32_t id, const float* x, float* vals);  /* nnzj  */ \
+    int32_t P##_shess(int32_t id, const float* x, const float* y,            \
+                      float obj_weight, float* vals);            /* nnzh  */
+#define CNLP_DECLARE_SINGLE_DEVICE(P)                                         \
+    int32_t P##_sobj_d (int32_t id, const float* x, float* out);             \
+    int32_t P##_sgrad_d(int32_t id, const float* x, float* g);               \
+    int32_t P##_scons_d(int32_t id, const float* x, float* c);               \
+    int32_t P##_sjac_d (int32_t id, const float* x, float* vals);            \
+    int32_t P##_shess_d(int32_t id, const float* x, const float* y,          \
+                        float obj_weight, float* vals);
+
+/* ── Number formats (0.2; optional per model; witness: P##_nformats) ───────
+ * Evaluation in any of the formats of formats/numbers.md: binary128,
+ * double-double, quad-double, arbitrary precision, or a format defined
+ * elsewhere under a reverse-DNS name.  P##_format_name(id, k, ...) returns
+ * the canonical name of format k (k in 0..P##_nformats(id)-1) by the string
+ * convention.  An arbitrary-precision entry is listed without its precision
+ * (`apfloat`); the caller chooses the precision per call through `prec`, in
+ * bits, which every other format ignores (pass 0).
+ *
+ * The _x callbacks are the core ones with type-erased buffers: every array
+ * is a contiguous array of elements of format k, of the length named in the
+ * core tier, laid out as formats/numbers.md specifies; `obj_weight` points
+ * to one element.  P##_xmeta fills x0, lvar, uvar, lcon, ucon in format k.
+ * All buffers belong to the caller.  Status 1 for k out of range, 4 for a
+ * `prec` the library cannot evaluate at. */
+#define CNLP_DECLARE_FORMATS(P)                                               \
+    int32_t P##_nformats(int32_t id);                                         \
+    int32_t P##_format_name(int32_t id, int32_t k, uint8_t* buf, int32_t cap); \
+    int32_t P##_xmeta(int32_t id, int32_t k, int64_t prec, void* x0,          \
+                      void* lvar, void* uvar, void* lcon, void* ucon);         \
+    int32_t P##_xobj (int32_t id, int32_t k, int64_t prec, const void* x,     \
+                      void* out);                                             \
+    int32_t P##_xgrad(int32_t id, int32_t k, int64_t prec, const void* x,     \
+                      void* g);                                               \
+    int32_t P##_xcons(int32_t id, int32_t k, int64_t prec, const void* x,     \
+                      void* c);                                               \
+    int32_t P##_xjac (int32_t id, int32_t k, int64_t prec, const void* x,     \
+                      void* vals);                                            \
+    int32_t P##_xhess(int32_t id, int32_t k, int64_t prec, const void* x,     \
+                      const void* y, const void* obj_weight, void* vals);
+
+/* A format name's DLPack description {code, bits, lanes} (formats/numbers.md,
+ * section 4), for consumers that exchange arrays with DLPack.  Returns 0 and
+ * fills the three values for binary32, binary64 and binary128 (canonical
+ * names or aliases), and returns 1 for any other format. */
+static inline int32_t cnlp_format_to_dlpack(const char* name, uint8_t* code,
+                                            uint8_t* bits, uint16_t* lanes) {
+    struct { const char* n; uint8_t b; } t[] = {
+        {"binary32", 32}, {"f32", 32}, {"binary64", 64}, {"f64", 64},
+        {"binary128", 128}, {"f128", 128}};
+    for (unsigned i = 0; i < sizeof t / sizeof t[0]; i++) {
+        const char* a = t[i].n; const char* b = name;
+        while (*a && *a == *b) { a++; b++; }
+        if (*a == 0 && *b == 0) { *code = 2; *bits = t[i].b; *lanes = 1; return 0; }
+    }
+    return 1;
+}
 
 #ifdef __cplusplus
 } /* extern "C" */

@@ -48,11 +48,18 @@ The multipliers satisfy stationarity of
     L(x, y, zL, zU) = σ f(x) + yᵀ c(x) − zLᵀ (x − lvar) + zUᵀ (x − uvar),
 
 with σ = 1 for minimization and −1 for maximization: the Lagrangian of the ABI's Hessian
-(`obj_weight * ∇²f + Σ yᵢ ∇²cᵢ`, with `obj_weight` = σ at a solution). A writer converts if
-its solver uses another convention.
+(`obj_weight * ∇²f + Σ yᵢ ∇²cᵢ`, with `obj_weight` = σ at a solution). Equivalently, the
+multipliers are those of the problem written as a minimization of σf, so `zL` and `zU` are
+nonnegative and the multipliers of a model do not change with how its sense is written.
 
-> **To confirm before this version is final:** that MadNLP's and Ipopt's results, as returned
-> through NLPModels, follow this convention, including for maximization.
+A writer converts from its solver's convention, and a reader converts back before using a
+solution as a warm start. The conventions of common interfaces, measured on Hock–Schittkowski
+problem 71 in both senses:
+
+| Source | Stationarity it satisfies | To this convention |
+|---|---|---|
+| NLPModels / SolverCore results (MadNLP, NLPModelsIpopt) | `∇f + Jᵀy − zL + zU = 0` | for maximization negate `y`, `zL`, `zU`; unchanged for minimization |
+| MathOptInterface duals (JuMP) | `σ∇f − Jᵀy − zL − zU = 0`, upper-bound duals ≤ 0 | `y = −y_MOI`, `zL = zL_MOI`, `zU = −zU_MOI`, in both senses |
 
 ## 3. Named blocks: section `/blocks`
 
@@ -120,16 +127,14 @@ The fingerprint digests the instance's **structure**: `nvar`, `ncon`, the Jacobi
 Hessian sparsity patterns, and the block layout. It excludes bounds and parameters, so a
 solution can warm-start a perturbed instance of the same structure. It is SHA-256 over a
 canonical serialization given with the conformance files. A library may export it, or a
-consumer computes it from the ABI's structure calls.
+consumer computes it from the ABI's structure calls. A digest that also covers bounds and
+parameters, telling "the same instance" from "the same structure", may be added later as a
+separate optional field; it would not change this one.
 
 A failed check is an error. A consumer may offer an explicit override, for deliberately
 using a solution on a different instance.
 
 ## 7. Open questions
 
-1. The sign convention of section 2.1: confirm it against MadNLP and Ipopt, including
-   maximization.
-2. Should the fingerprint have a second digest covering bounds and parameters, so a
-   reader can tell "the same instance" from "the same structure"?
-3. Several solutions in one file (a sweep): proposed out of scope for 0.2, one file per
+1. Several solutions in one file (a sweep): proposed out of scope for 0.2, one file per
    solution.
