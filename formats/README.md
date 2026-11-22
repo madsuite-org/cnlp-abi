@@ -1,119 +1,48 @@
 # cnlp data formats
 
-Version 0.2 of the cnlp ABI.
+Version 0.2. The files that go with a cnlp library, defined only through what `cnlp.h`
+publishes, so any consumer reads what another wrote.
 
-`cnlp.h` specifies how a program talks to a model library. These documents specify the
-files that go with it: what a model is instantiated from, the parameter values it is
-evaluated at, and the solutions computed for it. Any consumer of a cnlp library can read
-and write them using only what the ABI publishes, so a file written by one consumer
-(CNLPModels.jl, cnlpmodels-py, a command-line solver) is read by any other.
-
-| Format | Document | Holds | ABI it maps to |
-|---|---|---|---|
-| `cnlp-input` | [input.md](input.md) | the values a model is instantiated from | `P_new`, `P_new_str`, the builder tier |
-| `cnlp-parameters` | [parameters.md](parameters.md) | parameter values, by block name | the layout tier, `P_set_value` |
-| `cnlp-solution` | [solution.md](solution.md) | a solution and its multipliers | the core and layout tiers |
-
-[numbers.md](numbers.md) is not a file format: it names the number formats a model can be
-evaluated in (binary32, binary128, double-double, arbitrary precision) and fixes their
-memory layout, for the single-precision family and the number-format tier of `cnlp.h`.
-
-A solution file is also a valid warm start: its arrays are the initial point and
-multipliers of a new solve (solution.md, section 6).
-
-## Conventions shared by all three
-
-### Encodings
-
-Each format has two encodings carrying the same content.
-
-| Encoding | Use | Extension |
+| Format | Document | Holds |
 |---|---|---|
-| HDF5 | the primary encoding: binary, fast, one file | `.h5` |
-| JSON | readable, for small files and hand-written inputs | `.json` |
+| `cnlp-input` | [input.md](input.md) | the values a model is instantiated from |
+| `cnlp-parameters` | [parameters.md](parameters.md) | parameter values, by block name |
+| `cnlp-solution` | [solution.md](solution.md) | a solution and its multipliers; also a warm start |
 
-A reader must accept both. A writer should produce HDF5 unless asked otherwise. For a
-million double-precision values, HDF5 is written in milliseconds; JSON takes about a
-hundred times longer and is over twice the size.
+[numbers.md](numbers.md) defines the number formats a model can be evaluated in.
 
-### Identification
+## Conventions
 
-Every file carries, in HDF5 as attributes of the root group and in JSON as top-level
-members:
+**Encodings.** HDF5 (`.h5`, primary) and JSON (`.json`), same content. Readers accept
+both; writers produce HDF5 unless asked otherwise.
 
-| Field | Type | Meaning |
-|---|---|---|
-| `format` | string | the format of the main section: `"cnlp-input"`, `"cnlp-parameters"` or `"cnlp-solution"` |
-| `format_version` | string | `"MAJOR.MINOR"` of these documents: `"0.2"` |
-| `library` | string | optional: the library the model comes from |
-| `model` | string | optional: the model name, which is its symbol prefix |
+**Identification.** Root attributes (HDF5) or top-level members (JSON):
 
-A reader rejects a file whose major version it does not know. It may read a newer minor
-version, ignoring members it does not recognize.
+| Field | Meaning |
+|---|---|
+| `format` | `"cnlp-input"`, `"cnlp-parameters"` or `"cnlp-solution"` |
+| `format_version` | `"0.2"`; a reader rejects an unknown major version and ignores unknown members of a newer minor one |
+| `library`, `model` | optional: the library, and the model's symbol prefix |
 
-### Sections and composition
+**Sections.** Content lives in `/input`, `/parameters` or `/solution` (HDF5 groups, JSON
+members). A file may carry several; readers ignore sections they do not need.
 
-Each format's content lives in one section: `/input`, `/parameters` or `/solution` in
-HDF5, and members of the same names in JSON. A file may carry more than one section. A
-complete instance is input plus parameters, and a solution file may record the
-parameters it was solved with. A reader uses the sections it needs and ignores the rest.
-`format` names the section the file is primarily about.
+**Names** come from the ABI: input fields from `P_schema`, blocks from `P_block_name`.
 
-### Names
+**Values.** Floats are binary64, integers int64, booleans `true`/`false` (JSON) or int8
+0/1 (HDF5). A block is stored with its `dims`, column-major (first index fastest). In JSON
+arrays are flat and non-finite numbers are `null`.
 
-Every name in a file comes from the ABI and is never invented by the writer:
-
-- input fields are the names in the model's schema (`P_schema`);
-- blocks are the names the layout tier publishes (`P_block_name`).
-
-### Arrays
-
-- Floating-point values are IEEE 754 binary64, integers are signed 64-bit. A boolean is
-  `true`/`false` in JSON and an 8-bit integer 0 or 1 in HDF5.
-- A block's array is stored with its shape, in **column-major** order: the first index
-  varies fastest, as in Fortran, Julia and MATLAB. `dims` always gives the shape in that
-  order. A row-major reader (NumPy, C) sees the shape reversed and reads with
-  `order="F"` or transposes.
-- In JSON every array is flat, alongside its `dims`. Non-finite numbers, which JSON cannot
-  represent, are written as `null`.
-
-### Reading against a model
-
-A reader given a model checks a file before using it: the names it refers to exist with
-the right kind, type and length, and, for a solution, the sizes match the model's. A
-failed check is an error. A consumer may offer an explicit override for deliberate use on
-a different instance.
+**Reading against a model.** Names must exist with the right kind, type and length, and a
+solution's sizes must match the model's. A failed check is an error unless the consumer
+offers an explicit override.
 
 ## Model-specific formats
 
-A model may also have its own formats: an OPF model reads and writes MATPOWER cases, for
-example. These are provided by the **library**, through its readers and writers (`cnlp.h`:
-the readers and writers tiers), and identified by name:
+A library may read and write its own formats (an OPF model reads MATPOWER cases), through
+the readers and writers tiers: `P_new_from_<name>`, `P_set_from_<name>`,
+`P_start_from_<name>`, `P_write_<name>`. They add to the standard formats and never
+replace them; `P_default_reader` / `P_default_writer` name the default. Consumers write a
+model format as `name:path`.
 
-| Direction | Standard format | Model-specific (in the library) |
-|---|---|---|
-| create an instance | `cnlp-input` | instance readers, `P_new_from_<name>` |
-| set parameters | `cnlp-parameters` | parameter readers, `P_set_from_<name>` |
-| warm start | a `cnlp-solution` file | start readers, `P_start_from_<name>` |
-| write a solution | `cnlp-solution` | writers, `P_write_<name>` |
-
-Three rules:
-
-1. **Additive.** A model's formats sit alongside the standard ones and never replace them.
-   A consumer can always read and write the standard formats, so a tool that knows nothing
-   about a model's domain still works with it.
-2. **Discoverable.** Readers and writers are listed by name, and a model may name a default
-   for each direction (`P_default_reader`, `P_default_writer`). A consumer given a bare path
-   uses the default, and otherwise the standard format.
-3. **The logic is the model's.** A reader or writer runs inside the library, compiled from
-   the modelling package's own code, so consumers need no knowledge of the file format.
-   They pass a path.
-
-Consumers name a model format as `name:path` where one is expected, e.g.
-`--input matpower:case.m --start case:solved.m --output sol.m`.
-
-## Conformance
-
-Reference files for each format and encoding live in [conformance/](../conformance/).
-The consumer packages' test suites read and write them. As with the ABI, those test
-suites are the conformance tests.
+Reference files: [conformance/](../conformance/).
