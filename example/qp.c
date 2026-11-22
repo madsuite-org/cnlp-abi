@@ -5,9 +5,9 @@
  *     minimize   sum_i (x_i - 1)^2       over x in R^n
  *     subject to x_1 + x_2 = 1
  *
- * It also evaluates in a second number format, double-double (formats/numbers.md:
- * `double_binary64`), through the number-format tier, to show how a library
- * offers a format that C has no type for.
+ * It also shows two optional tiers: evaluation in double-double (formats/numbers.md,
+ * `double_binary64`), a format C has no type for, and a solution writer for JSON, an
+ * encoding the standard formats (HDF5) leave to libraries and consumers.
  *
  * Build:    cc -shared -fPIC -O2 -o libqp.so qp.c -lm
  * Consume:  see solve.c next to this file — or any cnlp consumer:
@@ -19,10 +19,14 @@
  * CNLP_DECLARE_MODEL(qp) expands P##_new, P##_obj, ... to qp_new, qp_obj, ...
  */
 #include <math.h>
+#include <stdio.h>
 #include "../cnlp.h"
 
 CNLP_DECLARE_MODEL(qp)
 CNLP_DECLARE_FORMATS(qp)
+CNLP_DECLARE_WRITERS(qp)
+int64_t qp_write_json(int64_t id, const char* path, const double* x, const double* y,
+                      const double* zl, const double* zu, double objective, const char* status);
 
 /* Instances are just sizes behind ids; a static table suffices. */
 #define QP_MAX_INSTANCES 32
@@ -220,6 +224,54 @@ int64_t qp_xhess(int64_t id, int64_t k, int64_t prec, const void* xv, const void
     dd w2 = dd_scale2(*(const dd*)obj_weight);
     for (int64_t i = 0; i < qp_sizes[id - 1]; i++) ((dd*)vals)[i] = w2;
     return 0;
+}
+
+/* ── a solution writer: JSON (writers tier) ─────────────────────────────────
+ * The cnlp-solution content in JSON: an encoding the spec leaves to libraries
+ * and consumers.  Same members as the HDF5 file; non-finite numbers are null. */
+
+static const char* qp_writers[] = { "json" };
+
+int64_t qp_nwriters(void) { return 1; }
+
+int64_t qp_writer_name(int64_t k, uint8_t* buf, int64_t cap) {
+    if (k != 0) return -1;
+    const char* nm = qp_writers[0];
+    int64_t len = 4;
+    for (int64_t i = 0; i < cap && i < len; i++) buf[i] = (uint8_t)nm[i];
+    return len;
+}
+
+int64_t qp_default_writer(int64_t id, uint8_t* buf, int64_t cap) {   /* none */
+    (void)buf; (void)cap;
+    return valid(id) ? 0 : -1;
+}
+
+static void json_num(FILE* f, double v) {
+    if (isfinite(v)) fprintf(f, "%.17g", v); else fputs("null", f);
+}
+static void json_arr(FILE* f, const char* key, const double* v, int64_t n) {
+    fprintf(f, "\"%s\": [", key);
+    for (int64_t i = 0; i < n; i++) { if (i) fputs(", ", f); json_num(f, v[i]); }
+    fputs("]", f);
+}
+
+int64_t qp_write_json(int64_t id, const char* path, const double* x, const double* y,
+                      const double* zl, const double* zu, double objective, const char* status) {
+    if (!valid(id)) return 1;
+    FILE* f = fopen(path, "w");
+    if (!f) return 2;
+    int64_t n = qp_sizes[id - 1];
+    fprintf(f, "{\"format\": \"cnlp-solution\", \"format_version\": \"0.2\", \"model\": \"qp\",\n");
+    fprintf(f, " \"nvar\": %lld, \"ncon\": 1,\n \"solution\": {", (long long)n);
+    json_arr(f, "solution", x, n); fputs(", ", f);
+    json_arr(f, "multipliers", y, 1); fputs(", ", f);
+    json_arr(f, "multipliers_L", zl, n); fputs(", ", f);
+    json_arr(f, "multipliers_U", zu, n);
+    fputs(", \"objective\": ", f); json_num(f, objective);
+    fprintf(f, ", \"minimize\": true, \"status\": \"%s\", \"iterations\": -1}}\n",
+            status ? status : "error");
+    return fclose(f) == 0 ? 0 : 2;
 }
 
 /* ── the library-level catalogue (optional tier, three lines here) ──────── */

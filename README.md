@@ -13,8 +13,8 @@ the library and solve the models, with no modeling tool installed.
 - **[formats/](formats/)**: the files that go with a library: the input a model is
   instantiated from ([input.md](formats/input.md)), parameter values
   ([parameters.md](formats/parameters.md)) and solutions ([solution.md](formats/solution.md)),
-  with HDF5 as the primary encoding and a JSON equivalent, and the number formats a model
-  can be evaluated in ([numbers.md](formats/numbers.md)).
+  in HDF5, and the number formats a model can be evaluated in
+  ([numbers.md](formats/numbers.md)).
 - **[example/](example/)**: a complete model library and a consumer in plain C.
 
 A model always has the core symbols (sizes, bounds, starting point, evaluation). Optional

@@ -7,9 +7,9 @@ variables and `ncon` constraints.
 
 ## 1. Content
 
-Root attributes (HDF5) or top-level members (JSON): `nvar`, `ncon`.
+Root attributes: `nvar`, `ncon`.
 
-`/solution` (the group ExaModelsIO writes for a stored solution):
+Group `/solution` (as ExaModelsIO writes a stored solution):
 
 | Field | Type | Meaning |
 |---|---|---|
@@ -22,8 +22,8 @@ Root attributes (HDF5) or top-level members (JSON): `nvar`, `ncon`.
 | `iterations` | integer | `-1` if unknown |
 | `solver`, `solver_status` | string | optional |
 
-With the layout tier, `/blocks/<kind>/<name>/` (JSON: `variables`, `constraints`,
-`parameters` objects) may add each block's slice in its shape, with `dims`:
+With the layout tier, `/blocks/<kind>/<name>/` may add each block's slice in its shape,
+with `dims`:
 variables `value`, `multiplier_L`, `multiplier_U`; constraints `value` (= `c(x)`),
 `multiplier`; parameters `value`. The flat arrays are the reference. Parameters may
 instead be a `/parameters` section ([parameters.md](parameters.md)).
@@ -45,7 +45,7 @@ readers convert (measured on HS71, both senses):
 ## 3. Use
 
 With no format given, a consumer writes with the model's `P_default_writer` if it has one,
-otherwise this format (`.json` gives JSON, anything else HDF5).
+otherwise this format.
 
 A solution read against a model gives a warm start (`x`, `y`, `zL`, `zU`); its `nvar` and
 `ncon` must match the model's. Further checks are the consumer's.

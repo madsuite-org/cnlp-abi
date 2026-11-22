@@ -11,15 +11,9 @@ Version 0.2. Conventions: [README.md](README.md).
 | `P_new_str(s)` | string `s`; a path is relative to the file's directory |
 | builder (`P_schema`) | one entry per schema field, named and typed as in the schema |
 
-Builder fields, by schema kind:
-
-| Kind | HDF5 | JSON |
-|---|---|---|
-| `scalar` (i64/f64) | scalar dataset `/input/<name>` | number |
-| `array` (i64/f64) | 1-D dataset | array |
-| `table` (`columns`) | group with one dataset per column, equal lengths | object with one array per column |
-
-Types must match the schema exactly; nothing is converted.
+Builder fields, by schema kind: `scalar` a scalar dataset `/input/<name>`; `array` a 1-D
+dataset; `table` a group `/input/<name>` with one dataset per column, of equal lengths.
+Types (i64, f64) must match the schema exactly; nothing is converted.
 
 **Reading.** Check that the file has exactly the entries the entry point needs, then call
 it: `P_new`, `P_new_str`, or `P_data_begin`, one `P_set_*` per field, `P_data_ready`,
@@ -28,7 +22,5 @@ reject inconsistent data.
 
 **Writing.** Use the names and types of the library's schema.
 
-```json
-{"format": "cnlp-input", "format_version": "0.2", "model": "acopf",
- "input": {"N": 3, "bus": {"i": [1, 2, 3], "pd": [0.0, 0.9, 1.2]}}}
-```
+Example: `/input/N` (scalar 3), `/input/bus/i` (`[1, 2, 3]`), `/input/bus/pd`
+(`[0.0, 0.9, 1.2]`).
