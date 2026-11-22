@@ -42,9 +42,11 @@
  *   - sparse structures are COO triplets;
  *   - the Hessian is the LOWER TRIANGLE of
  *         obj_weight * grad^2 f(x)  +  sum_i y_i * grad^2 c_i(x);
- *   - buffers are caller-allocated dense double / int32 / int64 arrays.
+ *   - buffers are caller-allocated dense double / int64 arrays;
+ *   - every integer in the ABI (ids, sizes, indices, counts, lengths and
+ *     returned statuses) is int64_t (0.2; int32_t in 0.1).
  *
- * STATUSES.  Every function returns int32.  0 = success, except the
+ * STATUSES.  Every function returns int64.  0 = success, except the
  * functions documented as returning a positive id, count, or byte length —
  * for those, 0 from an id-returning function means instantiation failure,
  * and -1 means an index out of range.  1 = invalid id, unknown index, or a
@@ -72,8 +74,7 @@
  * CANDIDATE EXTENSIONS (absent today, in likely order): Hessian/Jacobian-
  * vector products (P_hprod / P_jprod — consumers currently assemble
  * products from the COO callbacks); constraint linearity/equality
- * classification and integer variables; 64-bit index variants (CUTEst's
- * suffix discipline is the template); an explicit reentrancy contract
+ * classification and integer variables; an explicit reentrancy contract
  * (today: distinct instances from distinct threads is expected to work, a
  * single instance is not promised reentrant); per-block descriptions
  * (P_block_desc).
@@ -92,13 +93,13 @@ extern "C" {
  * per-model entry point needs a prefix, and this is where a prefix comes
  * from.  Model k's name (k in 0..n-1) is returned by the string convention
  * above; the name IS the symbol prefix its functions are exported under. */
-int32_t cnlp_nmodels(void);
-int32_t cnlp_model_name(int32_t k, uint8_t* buf, int32_t cap);
+int64_t cnlp_nmodels(void);
+int64_t cnlp_model_name(int64_t k, uint8_t* buf, int64_t cap);
 
 /* The version of this specification a library implements, as
  * major * 1000 + minor (2 for 0.2).  Optional (0.2; witness: the symbol
  * itself); a library without it implements 0.1. */
-int32_t cnlp_abi_version(void);
+int64_t cnlp_abi_version(void);
 
 /* ── Core + instantiation, per prefix P (required) ────────────────────────
  * Exactly ONE of P##_new / P##_new_str / the builder is the model's entry
@@ -114,31 +115,31 @@ int32_t cnlp_abi_version(void);
  *
  * P##_nargs is the count of values that close the model (0 = fixed). */
 #define CNLP_DECLARE_MODEL(P)                                                 \
-    int32_t P##_nargs(void);                                                  \
-    int32_t P##_argtype(uint8_t* buf, int32_t cap);                           \
-    int32_t P##_new(int32_t n);                  /* -> id > 0; 0 = failure */ \
+    int64_t P##_nargs(void);                                                  \
+    int64_t P##_argtype(uint8_t* buf, int64_t cap);                           \
+    int64_t P##_new(int64_t n);                  /* -> id > 0; 0 = failure */ \
     /* metadata, per instance id.  P##_meta fills caller buffers of length    \
        nvar (x0, lvar, uvar) and ncon (lcon, ucon); +-INFINITY is fine. */    \
-    int32_t P##_nvar(int32_t id);                                             \
-    int32_t P##_ncon(int32_t id);                                             \
-    int32_t P##_nnzj(int32_t id);                                             \
-    int32_t P##_nnzh(int32_t id);                                             \
-    int32_t P##_meta(int32_t id, double* x0, double* lvar, double* uvar,      \
+    int64_t P##_nvar(int64_t id);                                             \
+    int64_t P##_ncon(int64_t id);                                             \
+    int64_t P##_nnzj(int64_t id);                                             \
+    int64_t P##_nnzh(int64_t id);                                             \
+    int64_t P##_meta(int64_t id, double* x0, double* lvar, double* uvar,      \
                      double* lcon, double* ucon);                             \
     /* evaluation, per instance id; buffer lengths in comments */             \
-    int32_t P##_obj (int32_t id, const double* x, double* out);  /* 1     */ \
-    int32_t P##_grad(int32_t id, const double* x, double* g);    /* nvar  */ \
-    int32_t P##_cons(int32_t id, const double* x, double* c);    /* ncon  */ \
-    int32_t P##_jac_structure(int32_t id, int32_t* rows, int32_t* cols);      \
-    int32_t P##_jac (int32_t id, const double* x, double* vals); /* nnzj  */ \
-    int32_t P##_hess_structure(int32_t id, int32_t* rows, int32_t* cols);     \
-    int32_t P##_hess(int32_t id, const double* x, const double* y,            \
+    int64_t P##_obj (int64_t id, const double* x, double* out);  /* 1     */ \
+    int64_t P##_grad(int64_t id, const double* x, double* g);    /* nvar  */ \
+    int64_t P##_cons(int64_t id, const double* x, double* c);    /* ncon  */ \
+    int64_t P##_jac_structure(int64_t id, int64_t* rows, int64_t* cols);      \
+    int64_t P##_jac (int64_t id, const double* x, double* vals); /* nnzj  */ \
+    int64_t P##_hess_structure(int64_t id, int64_t* rows, int64_t* cols);     \
+    int64_t P##_hess(int64_t id, const double* x, const double* y,            \
                      double obj_weight, double* vals);           /* nnzh  */
 
 /* String entry point — a model instantiated from one string (a case-file
  * path, say).  Declared separately because most models do not have it. */
 #define CNLP_DECLARE_NEW_STR(P)                                               \
-    int32_t P##_new_str(const char* s);          /* -> id > 0; 0 = failure */
+    int64_t P##_new_str(const char* s);          /* -> id > 0; 0 = failure */
 
 /* ── Structured instantiation (optional per model; witness: P##_schema) ───
  * For models built from structured data.  P##_schema returns JSON:
@@ -152,20 +153,20 @@ int32_t cnlp_abi_version(void);
  * nothing is coerced.  P##_data_ready returns 1 iff the builder's data is
  * complete and consistent; the library decides, not the consumer. */
 #define CNLP_DECLARE_BUILDER(P)                                               \
-    int32_t P##_schema(uint8_t* buf, int32_t cap);                            \
-    int32_t P##_data_begin(void);                /* -> builder id > 0      */ \
-    int32_t P##_set_scalar_i64(int32_t b, const char* field, int64_t v);      \
-    int32_t P##_set_scalar_f64(int32_t b, const char* field, double v);       \
-    int32_t P##_set_array_i64 (int32_t b, const char* field,                  \
-                               const int64_t* v, int32_t len);                \
-    int32_t P##_set_array_f64 (int32_t b, const char* field,                  \
-                               const double* v, int32_t len);                 \
-    int32_t P##_set_col_i64   (int32_t b, const char* table, const char* col, \
-                               const int64_t* v, int32_t len);                \
-    int32_t P##_set_col_f64   (int32_t b, const char* table, const char* col, \
-                               const double* v, int32_t len);                 \
-    int32_t P##_data_ready    (int32_t b);       /* 1 iff complete         */ \
-    int32_t P##_new_from_data (int32_t b);       /* -> id > 0; 0 = failure */
+    int64_t P##_schema(uint8_t* buf, int64_t cap);                            \
+    int64_t P##_data_begin(void);                /* -> builder id > 0      */ \
+    int64_t P##_set_scalar_i64(int64_t b, const char* field, int64_t v);      \
+    int64_t P##_set_scalar_f64(int64_t b, const char* field, double v);       \
+    int64_t P##_set_array_i64 (int64_t b, const char* field,                  \
+                               const int64_t* v, int64_t len);                \
+    int64_t P##_set_array_f64 (int64_t b, const char* field,                  \
+                               const double* v, int64_t len);                 \
+    int64_t P##_set_col_i64   (int64_t b, const char* table, const char* col, \
+                               const int64_t* v, int64_t len);                \
+    int64_t P##_set_col_f64   (int64_t b, const char* table, const char* col, \
+                               const double* v, int64_t len);                 \
+    int64_t P##_data_ready    (int64_t b);       /* 1 iff complete         */ \
+    int64_t P##_new_from_data (int64_t b);       /* -> id > 0; 0 = failure */
 
 /* ── Named blocks (optional per model; witness: P##_nblocks) ──────────────
  * The blocks the model's author NAMED — variables, constraints, parameters
@@ -184,12 +185,12 @@ int32_t cnlp_abi_version(void);
  * own values.  get/set on a non-parameter block returns 1; a length
  * disagreeing with the block returns 3. */
 #define CNLP_DECLARE_LAYOUT(P)                                                \
-    int32_t P##_nblocks(int32_t id);                                          \
-    int32_t P##_block(int32_t id, int32_t k, int32_t* out);                   \
-    int32_t P##_block_name(int32_t id, int32_t k, uint8_t* buf, int32_t cap); \
-    int32_t P##_get_value(int32_t id, int32_t k, double* vals, int32_t len);  \
-    int32_t P##_set_value(int32_t id, int32_t k,                              \
-                          const double* vals, int32_t len);
+    int64_t P##_nblocks(int64_t id);                                          \
+    int64_t P##_block(int64_t id, int64_t k, int64_t* out);                   \
+    int64_t P##_block_name(int64_t id, int64_t k, uint8_t* buf, int64_t cap); \
+    int64_t P##_get_value(int64_t id, int64_t k, double* vals, int64_t len);  \
+    int64_t P##_set_value(int64_t id, int64_t k,                              \
+                          const double* vals, int64_t len);
 
 /* ── Objective sense (0.2; optional per model; witness: P##_minimize) ─────
  * 1 = minimize, 0 = maximize, -1 = invalid id.  A consumer that does not
@@ -197,14 +198,14 @@ int32_t cnlp_abi_version(void);
  * it maximizes, or consumers solve the wrong problem (and report success).
  * P##_obj returns f(x) in the model's own sense, never negated. */
 #define CNLP_DECLARE_SENSE(P)                                                 \
-    int32_t P##_minimize(int32_t id);
+    int64_t P##_minimize(int64_t id);
 
 /* ── Solution writers (0.2; optional per model; witness: P##_nwriters) ────
  * Code that turns a solution into the model's own file format (a solved
  * MATPOWER case, say).  Writer k (0-based) has a name, by the string
  * convention; writer "name" is exported as
  *
- *     int32_t P##_write_<name>(int32_t id, const char* path,
+ *     int64_t P##_write_<name>(int64_t id, const char* path,
  *                              const double* x,  const double* y,
  *                              const double* zl, const double* zu,
  *                              double objective, const char* status);
@@ -214,9 +215,9 @@ int32_t cnlp_abi_version(void);
  * asked for "the" solution file without a format; 0 means none, and the
  * consumer writes the standard cnlp-solution format (formats/solution.md). */
 #define CNLP_DECLARE_WRITERS(P)                                               \
-    int32_t P##_nwriters(void);                                               \
-    int32_t P##_writer_name(int32_t k, uint8_t* buf, int32_t cap);            \
-    int32_t P##_default_writer(int32_t id, uint8_t* buf, int32_t cap);
+    int64_t P##_nwriters(void);                                               \
+    int64_t P##_writer_name(int64_t k, uint8_t* buf, int64_t cap);            \
+    int64_t P##_default_writer(int64_t id, uint8_t* buf, int64_t cap);
 
 /* ── Readers (0.2; optional per model; witness: P##_nreaders) ─────────────
  * The mirror of writers: the model's own input formats, alongside the
@@ -228,13 +229,13 @@ int32_t cnlp_abi_version(void);
  *
  * By kind, reader "name" is exported as
  *
- *     instance    int32_t P##_new_from_<name>(const char* path);
+ *     instance    int64_t P##_new_from_<name>(const char* path);
  *                 -> id > 0; 0 = failure.  Creates an instance from the
  *                 model's own file (an OPF case, say).
- *     parameters  int32_t P##_set_from_<name>(int32_t id, const char* path);
+ *     parameters  int64_t P##_set_from_<name>(int64_t id, const char* path);
  *                 -> 0, or a status as for P##_set_value.  Sets parameter
  *                 blocks from the file; live, like P##_set_value.
- *     start       int32_t P##_start_from_<name>(int32_t id, const char* path,
+ *     start       int64_t P##_start_from_<name>(int64_t id, const char* path,
  *                     double* x0, double* y0, double* zl, double* zu);
  *                 -> 0 or a status.  Fills host arrays of length nvar, ncon,
  *                 nvar, nvar with a starting point read from the file, every
@@ -246,10 +247,10 @@ int32_t cnlp_abi_version(void);
  * model also exports P##_new_str, the two must agree: P##_new_str is the
  * default instance reader under its 0.1 name. */
 #define CNLP_DECLARE_READERS(P)                                               \
-    int32_t P##_nreaders(void);                                               \
-    int32_t P##_reader_name(int32_t k, uint8_t* buf, int32_t cap);            \
-    int32_t P##_reader_kind(int32_t k);                                       \
-    int32_t P##_default_reader(uint8_t* buf, int32_t cap);
+    int64_t P##_nreaders(void);                                               \
+    int64_t P##_reader_name(int64_t k, uint8_t* buf, int64_t cap);            \
+    int64_t P##_reader_kind(int64_t k);                                       \
+    int64_t P##_default_reader(uint8_t* buf, int64_t cap);
 
 /* ── Device evaluation (0.2; optional per model; witness: P##_device) ─────
  * Evaluation on a GPU with device pointers in and out.  P##_device(id)
@@ -266,12 +267,12 @@ int32_t cnlp_abi_version(void);
  * Candidate extensions, signature-preserving: P##_set_device(id, ordinal),
  * P##_set_stream(id, stream) for asynchronous calls on the caller's stream. */
 #define CNLP_DECLARE_DEVICE(P)                                                \
-    int32_t P##_device(int32_t id);                                           \
-    int32_t P##_obj_d (int32_t id, const double* x, double* out);            \
-    int32_t P##_grad_d(int32_t id, const double* x, double* g);              \
-    int32_t P##_cons_d(int32_t id, const double* x, double* c);              \
-    int32_t P##_jac_d (int32_t id, const double* x, double* vals);           \
-    int32_t P##_hess_d(int32_t id, const double* x, const double* y,         \
+    int64_t P##_device(int64_t id);                                           \
+    int64_t P##_obj_d (int64_t id, const double* x, double* out);            \
+    int64_t P##_grad_d(int64_t id, const double* x, double* g);              \
+    int64_t P##_cons_d(int64_t id, const double* x, double* c);              \
+    int64_t P##_jac_d (int64_t id, const double* x, double* vals);           \
+    int64_t P##_hess_d(int64_t id, const double* x, const double* y,         \
                        double obj_weight, double* vals);
 
 /* ── Single precision (0.2; optional per model; witness: P##_sobj) ─────────
@@ -282,18 +283,18 @@ int32_t cnlp_abi_version(void);
  * export the binary32 device callbacks (witness: P##_sobj_d), with the
  * conventions of the device tier. */
 #define CNLP_DECLARE_SINGLE(P)                                                \
-    int32_t P##_sobj (int32_t id, const float* x, float* out);   /* 1     */ \
-    int32_t P##_sgrad(int32_t id, const float* x, float* g);     /* nvar  */ \
-    int32_t P##_scons(int32_t id, const float* x, float* c);     /* ncon  */ \
-    int32_t P##_sjac (int32_t id, const float* x, float* vals);  /* nnzj  */ \
-    int32_t P##_shess(int32_t id, const float* x, const float* y,            \
+    int64_t P##_sobj (int64_t id, const float* x, float* out);   /* 1     */ \
+    int64_t P##_sgrad(int64_t id, const float* x, float* g);     /* nvar  */ \
+    int64_t P##_scons(int64_t id, const float* x, float* c);     /* ncon  */ \
+    int64_t P##_sjac (int64_t id, const float* x, float* vals);  /* nnzj  */ \
+    int64_t P##_shess(int64_t id, const float* x, const float* y,            \
                       float obj_weight, float* vals);            /* nnzh  */
 #define CNLP_DECLARE_SINGLE_DEVICE(P)                                         \
-    int32_t P##_sobj_d (int32_t id, const float* x, float* out);             \
-    int32_t P##_sgrad_d(int32_t id, const float* x, float* g);               \
-    int32_t P##_scons_d(int32_t id, const float* x, float* c);               \
-    int32_t P##_sjac_d (int32_t id, const float* x, float* vals);            \
-    int32_t P##_shess_d(int32_t id, const float* x, const float* y,          \
+    int64_t P##_sobj_d (int64_t id, const float* x, float* out);             \
+    int64_t P##_sgrad_d(int64_t id, const float* x, float* g);               \
+    int64_t P##_scons_d(int64_t id, const float* x, float* c);               \
+    int64_t P##_sjac_d (int64_t id, const float* x, float* vals);            \
+    int64_t P##_shess_d(int64_t id, const float* x, const float* y,          \
                         float obj_weight, float* vals);
 
 /* ── Number formats (0.2; optional per model; witness: P##_nformats) ───────
@@ -312,26 +313,26 @@ int32_t cnlp_abi_version(void);
  * All buffers belong to the caller.  Status 1 for k out of range, 4 for a
  * `prec` the library cannot evaluate at. */
 #define CNLP_DECLARE_FORMATS(P)                                               \
-    int32_t P##_nformats(int32_t id);                                         \
-    int32_t P##_format_name(int32_t id, int32_t k, uint8_t* buf, int32_t cap); \
-    int32_t P##_xmeta(int32_t id, int32_t k, int64_t prec, void* x0,          \
+    int64_t P##_nformats(int64_t id);                                         \
+    int64_t P##_format_name(int64_t id, int64_t k, uint8_t* buf, int64_t cap); \
+    int64_t P##_xmeta(int64_t id, int64_t k, int64_t prec, void* x0,          \
                       void* lvar, void* uvar, void* lcon, void* ucon);         \
-    int32_t P##_xobj (int32_t id, int32_t k, int64_t prec, const void* x,     \
+    int64_t P##_xobj (int64_t id, int64_t k, int64_t prec, const void* x,     \
                       void* out);                                             \
-    int32_t P##_xgrad(int32_t id, int32_t k, int64_t prec, const void* x,     \
+    int64_t P##_xgrad(int64_t id, int64_t k, int64_t prec, const void* x,     \
                       void* g);                                               \
-    int32_t P##_xcons(int32_t id, int32_t k, int64_t prec, const void* x,     \
+    int64_t P##_xcons(int64_t id, int64_t k, int64_t prec, const void* x,     \
                       void* c);                                               \
-    int32_t P##_xjac (int32_t id, int32_t k, int64_t prec, const void* x,     \
+    int64_t P##_xjac (int64_t id, int64_t k, int64_t prec, const void* x,     \
                       void* vals);                                            \
-    int32_t P##_xhess(int32_t id, int32_t k, int64_t prec, const void* x,     \
+    int64_t P##_xhess(int64_t id, int64_t k, int64_t prec, const void* x,     \
                       const void* y, const void* obj_weight, void* vals);
 
 /* A format name's DLPack description {code, bits, lanes} (formats/numbers.md,
  * section 4), for consumers that exchange arrays with DLPack.  Returns 0 and
  * fills the three values for binary32, binary64 and binary128 (canonical
  * names or aliases), and returns 1 for any other format. */
-static inline int32_t cnlp_format_to_dlpack(const char* name, uint8_t* code,
+static inline int64_t cnlp_format_to_dlpack(const char* name, uint8_t* code,
                                             uint8_t* bits, uint16_t* lanes) {
     struct { const char* n; uint8_t b; } t[] = {
         {"binary32", 32}, {"f32", 32}, {"binary64", 64}, {"f64", 64},

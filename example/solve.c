@@ -20,11 +20,11 @@ CNLP_DECLARE_MODEL(qp)
 int main(void) {
     /* Instantiate at a size of our choosing — the library was compiled
      * knowing no particular n. */
-    int32_t id = qp_new(4);
+    int64_t id = qp_new(4);
     if (id <= 0) { fprintf(stderr, "qp_new failed\n"); return 1; }
 
-    int32_t n = qp_nvar(id), m = qp_ncon(id);
-    printf("qp instance %d: n = %d, m = %d\n", id, n, m);
+    int64_t n = qp_nvar(id), m = qp_ncon(id);
+    printf("qp instance %lld: n = %lld, m = %lld\n", (long long)id, (long long)n, (long long)m);
 
     double *x0 = malloc(n * sizeof *x0), *lv = malloc(n * sizeof *lv),
            *uv = malloc(n * sizeof *uv), lc[1], uc[1];
