@@ -1,60 +1,60 @@
-# cnlp — a C ABI for nonlinear programs
+# cnlp: the C ABI for nonlinear programs
 
-One shared library carries any number of optimization models; each model
-publishes what it is, what it instantiates from, and how to evaluate it —
-objective, gradient, constraints, sparse Jacobian and Lagrangian Hessian —
-behind plain C symbols, consumable from any language with a `dlopen`.
+A cnlp library is a shared library that carries one or more optimization models. Each model
+exports plain C symbols to instantiate it and to evaluate its objective, gradient,
+constraints, sparse Jacobian and Lagrangian Hessian. Any language that can call C can load
+the library and solve the models, with no modeling tool installed.
 
-- **[cnlp.h](cnlp.h)** — the specification. The header *is* the normative
-  document (the sqlite3.h model — one artifact, nothing to drift from it):
-  every contract lives in its comments, and its X-macros declare the full
-  surface for a symbol prefix, so implementers get prototype checking
-  against the same file they read.
-- **[formats/](formats/)**: the files that go with the ABI, specified in
-  terms of what the header publishes: the input a model is instantiated from
-  ([input.md](formats/input.md)), parameter values
-  ([parameters.md](formats/parameters.md)), and solutions
-  ([solution.md](formats/solution.md)). The header specifies the interface;
-  these specify the data, so a file written by one consumer is read by any
-  other.
+## What is here
 
-## Relation to prior work
+- **[cnlp.h](cnlp.h)**: the specification, version 0.2. The header is the normative
+  document: each contract is in its comments, and its macros declare every symbol for a
+  model prefix, so an implementation is checked against the file it follows.
+- **[formats/](formats/)**: the files that go with a library: the input a model is
+  instantiated from ([input.md](formats/input.md)), parameter values
+  ([parameters.md](formats/parameters.md)) and solutions ([solution.md](formats/solution.md)),
+  in HDF5, and the number formats a model can be evaluated in
+  ([numbers.md](formats/numbers.md)).
+- **[example/](example/)**: a complete model library and a consumer in plain C.
 
-The evaluation semantics are [NLPModels.jl](https://jso.dev/NLPModels.jl/stable/api/)'s,
-transliterated to C; the Lagrangian-Hessian convention (objective weight +
-multipliers, lower triangle) goes back to the
-[AMPL Solver Library](https://www.netlib.org/ampl/solvers/asl.h). The
-compiled-model-per-library idea is [CUTEst](https://github.com/ralna/CUTEst)'s,
-here made size-parametric at runtime and multi-model;
-[CppADCodeGen](https://github.com/joaoleal/CppADCodeGen) pioneered the
-in-library model catalogue this ABI's fixed-name symbols follow, and
-[CasADi](https://web.casadi.org/docs/)'s codegen convention is the
-function-level cousin. [FMI](https://fmi-standard.org) is the architectural
-analogue from simulation — shared library, typed description, instantiation,
-live parameters — with no NLP contract; this ABI is, structurally, FMI for
-NLPs. Solver C APIs (Ipopt, nlopt) define the same callbacks in the opposite
-direction — the consumer implements them for a solver — which is why a cnlp
-library binds directly to them. No standalone NLP ABI specification
-predates this one, to our knowledge.
+A model always has the core symbols (sizes, bounds, starting point, evaluation). Optional
+tiers add a library-level model list, instantiation from structured data, named blocks of
+variables, constraints and parameters, the objective sense, solution writers, readers of
+the model's own file formats, evaluation on a GPU with device pointers, evaluation in
+binary32, and evaluation in other number formats (binary128, double-double, arbitrary
+precision). A consumer checks one symbol per tier and works without the tiers a library
+does not export.
 
-**[example/](example/)** is the whole ABI in two small plain-C files:
-[`qp.c`](example/qp.c), a complete size-parametric model library (~130
-lines, including the catalogue tier), and [`solve.c`](example/solve.c), a
-consumer that links against it — no dlopen, no tooling:
+## Example
 
 ```sh
-cc -shared -fPIC -O2 -o libqp.so qp.c
+cd example
+cc -shared -fPIC -O2 -o libqp.so qp.c -lm
 cc -O2 -o solve solve.c -L. -lqp -Wl,-rpath,'$ORIGIN' -lm && ./solve
 ```
 
-The same `libqp.so` loads unchanged in the Julia and Python consumers.
+The example model also evaluates in double-double (`double_binary64`) through the
+number-format tier: a format with no C type, carried as two `double`s per value.
 
-Consumers: [CNLPModels.jl](https://github.com/madsuite-org/CNLPModels.jl)
-(Julia) and [cnlpmodels-py](https://github.com/madsuite-org/cnlpmodels-py)
-(Python, ctypes + numpy). Both carry `tinyqp.c`, a complete reference
-implementation in plain C, and their test suites are the ABI's conformance
-tests. The primary producer is
-[ExaModelsCompiler](https://github.com/madsuite-org/ExaModels.jl), which
-compiles [ExaModels](https://github.com/madsuite-org/ExaModels.jl) model
-recipes ahead of time — but the ABI is producer-neutral by design: anything
-that can export these symbols is a model library.
+## Producers and consumers
+
+- [ExaModelsCompiler](https://github.com/madsuite-org/ExaModels.jl) compiles
+  [ExaModels](https://github.com/madsuite-org/ExaModels.jl) models into cnlp libraries
+  ahead of time, optionally with GPU evaluation.
+- [CNLPModels.jl](https://github.com/madsuite-org/CNLPModels.jl) (Julia) and
+  [cnlpmodels-py](https://github.com/madsuite-org/cnlpmodels-py) (Python) load cnlp
+  libraries as NLPModels and Python objects. Their test suites are the conformance tests.
+- [exalib](https://github.com/madsuite-org/exalib) installs compiled libraries by name.
+
+The ABI does not depend on any of these: anything that exports the symbols is a cnlp library.
+
+## Prior work
+
+The evaluation semantics follow [NLPModels.jl](https://jso.dev/NLPModels.jl/stable/api/),
+and the Lagrangian Hessian convention (objective weight and multipliers, lower triangle)
+follows the [AMPL Solver Library](https://www.netlib.org/ampl/solvers/asl.h).
+[CUTEst](https://github.com/ralna/CUTEst) compiles test problems into libraries;
+[CppADCodeGen](https://github.com/joaoleal/CppADCodeGen) introduced the in-library model
+list; [FMI](https://fmi-standard.org) is the analogous standard for simulation models.
+Solver C APIs such as Ipopt's define the same callbacks in the other direction, so a cnlp
+library binds to them directly.
