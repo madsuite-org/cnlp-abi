@@ -1,7 +1,5 @@
 # Conformance
 
-- [fingerprint.py](fingerprint.py): reference fingerprint (formats/solution.md, section 4),
-  standard library only: `python3 fingerprint.py libqp.so qp 4`.
 - [qp-4/](qp-4/): `example/qp.c` at `n = 4` (`min Σ(xᵢ − 1)²  s.t.  x₁ + x₂ = 1`), its
   input and exact solution (`x = (0.5, 0.5, 1, 1)`, `f = 0.5`, `y = 1`, `zL = zU = 0`), in
   JSON and HDF5.

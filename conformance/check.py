@@ -5,16 +5,13 @@
 
 Builds example/qp.c, runs example/solve.c, then checks conformance/qp-4: the files'
 identification and shapes, the input instantiates the model, the solution is the model's
-(objective, feasibility, stationarity in the sign convention of formats/solution.md,
-fingerprint), and each HDF5 file holds the same content as its JSON twin (needs h5py).
+(objective, feasibility, stationarity in the sign convention of formats/solution.md), and each HDF5 file holds the same content as its JSON twin (needs h5py).
 Exits nonzero on any failure.
 """
 import ctypes, json, math, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-sys.path.insert(0, HERE)
-from fingerprint import fingerprint  # noqa: E402
 
 I64, F64 = ctypes.c_int64, ctypes.c_double
 STATUSES = {"solved", "acceptable", "infeasible", "unbounded", "iteration_limit", "time_limit", "error"}
@@ -62,7 +59,6 @@ def check_solution(lib, d, where):
         check(len(s[k]) == L, f"{where}: {k} has length {L}")
     check(s["status"] in STATUSES, f"{where}: status is solver-neutral")
     check(isinstance(s["minimize"], bool), f"{where}: minimize is a boolean")
-    check(d.get("fingerprint") == fingerprint(lib, "qp", iid), f"{where}: fingerprint matches the model")
 
     vec = lambda v: (F64 * len(v))(*v)
     x, y, zl, zu = (vec(s[k]) for k in ("solution", "multipliers", "multipliers_L", "multipliers_U"))

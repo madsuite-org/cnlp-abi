@@ -7,8 +7,7 @@ variables and `ncon` constraints.
 
 ## 1. Content
 
-Root attributes (HDF5) or top-level members (JSON): `nvar`, `ncon` (required) and
-`fingerprint` (optional, section 4).
+Root attributes (HDF5) or top-level members (JSON): `nvar`, `ncon`.
 
 `/solution` (the group ExaModelsIO writes for a stored solution):
 
@@ -48,20 +47,5 @@ readers convert (measured on HS71, both senses):
 With no format given, a consumer writes with the model's `P_default_writer` if it has one,
 otherwise this format (`.json` gives JSON, anything else HDF5).
 
-Read against a model, a solution is a warm start (`x`, `y`, `zL`, `zU`). It must belong to
-the instance: `nvar` and `ncon` match (always checked), and `model`, `library` and
-`fingerprint` match when present. A failed check is an error unless explicitly overridden.
-
-## 4. Fingerprint
-
-`sha256:` plus the lowercase hex SHA-256 of, as little-endian `int64` unless stated:
-
-1. the 18 ASCII bytes `cnlp-fingerprint/1`;
-2. `nvar`, `ncon`;
-3. `nnzj`, its rows, its columns (`P_jac_structure`, 1-based, in order);
-4. `nnzh`, its rows, its columns (`P_hess_structure`);
-5. `P_nblocks` (0 without the layout tier), then per block: `P_block`'s `kind`, `offset`,
-   `length`, `ndims`, dims, then the name's byte length and UTF-8 bytes.
-
-It covers structure only: bounds, the starting point and parameters are excluded.
-Reference implementation: [conformance/fingerprint.py](../conformance/fingerprint.py).
+A solution read against a model gives a warm start (`x`, `y`, `zL`, `zU`); its `nvar` and
+`ncon` must match the model's. Further checks are the consumer's.
